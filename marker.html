@@ -4,8 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GeoQuest — Marker Demo</title>
-  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -13,38 +11,35 @@
     :root {
       --accent: #00f5a0;
       --bg: #0a0a0f;
-      --surface: rgba(13,13,26,0.95);
       --text: #e8e8f0;
       --muted: #666680;
     }
 
     body { font-family: 'Syne', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
 
-    /* ── Pre-scan screen ── */
-    #pre-scan {
-      position: fixed; inset: 0; z-index: 100;
-      background: var(--bg);
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: 2rem; text-align: center;
-      gap: 1.5rem;
-    }
-
-    #pre-scan::before {
+    body::before {
       content: '';
-      position: absolute; inset: 0;
+      position: fixed; inset: 0;
       background-image:
         linear-gradient(rgba(0,245,160,0.03) 1px, transparent 1px),
         linear-gradient(90deg, rgba(0,245,160,0.03) 1px, transparent 1px);
       background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    /* ── Pre-scan screen ── */
+    #pre-scan {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 2rem; text-align: center; gap: 1.5rem;
     }
 
     .back-btn {
       position: absolute; top: 1.5rem; left: 1.5rem;
       font-family: 'DM Mono', monospace; font-size: 0.75rem;
       color: var(--muted); text-decoration: none;
-      letter-spacing: 0.05em;
-      transition: color 0.2s;
+      letter-spacing: 0.05em; transition: color 0.2s;
     }
     .back-btn:hover { color: var(--accent); }
 
@@ -58,7 +53,6 @@
       font-size: 2.5rem; font-weight: 800;
       letter-spacing: -0.03em; line-height: 1.1;
     }
-
     #pre-scan h1 span { color: var(--accent); }
 
     .instruction {
@@ -68,58 +62,44 @@
 
     .marker-preview {
       width: 120px; height: 120px;
-      border: 2px solid var(--accent);
-      border-radius: 12px;
+      border: 2px solid var(--accent); border-radius: 12px;
       display: flex; align-items: center; justify-content: center;
-      position: relative;
       animation: pulse-border 2s ease-in-out infinite;
     }
-
-    .marker-preview img {
-      width: 90px; height: 90px;
-      filter: invert(1);
-      opacity: 0.9;
-    }
+    .marker-preview img { width: 90px; height: 90px; filter: invert(1); opacity: 0.9; }
 
     @keyframes pulse-border {
       0%, 100% { box-shadow: 0 0 0 0 rgba(0,245,160,0.4); }
-      50% { box-shadow: 0 0 0 8px rgba(0,245,160,0); }
+      50%       { box-shadow: 0 0 0 8px rgba(0,245,160,0); }
     }
 
     .tips {
       font-family: 'DM Mono', monospace; font-size: 0.72rem;
       color: var(--muted); display: flex; flex-direction: column; gap: 0.4rem;
     }
-
     .tips span::before { content: '→ '; color: var(--accent); }
 
     .btn-primary {
       background: var(--accent); color: #0a0a0f;
       font-family: 'Syne', sans-serif; font-weight: 700;
-      font-size: 1rem; letter-spacing: 0.02em;
-      border: none; border-radius: 50px;
+      font-size: 1rem; border: none; border-radius: 50px;
       padding: 0.9rem 2.5rem; cursor: pointer;
       transition: transform 0.15s, box-shadow 0.15s;
     }
-
     .btn-primary:hover {
       transform: translateY(-2px);
       box-shadow: 0 8px 24px rgba(0,245,160,0.3);
     }
 
-    /* ── AR Overlay UI ── */
+    /* ── AR overlay ── */
     #ar-ui {
-      display: none;
-      position: fixed; inset: 0; z-index: 50;
+      display: none; position: fixed; inset: 0; z-index: 50;
       pointer-events: none;
     }
-
     #ar-ui.active { display: block; }
 
-    /* Scanning frame */
     #scan-frame {
-      position: absolute;
-      top: 50%; left: 50%;
+      position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       width: 220px; height: 220px;
     }
@@ -133,14 +113,7 @@
     .corner.tr { top:0; right:0; border-width: 3px 3px 0 0; }
     .corner.bl { bottom:0; left:0; border-width: 0 0 3px 3px; }
     .corner.br { bottom:0; right:0; border-width: 0 3px 3px 0; }
-
     #scan-frame.detected .corner { border-color: #00ff88; }
-    #scan-frame.detected { animation: frame-flash 0.3s ease; }
-
-    @keyframes frame-flash {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
 
     #scan-status {
       position: absolute; bottom: 1.5rem; left: 50%;
@@ -149,17 +122,13 @@
       letter-spacing: 0.1em; color: var(--text);
       background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
       padding: 0.5rem 1.2rem; border-radius: 50px;
-      border: 1px solid rgba(255,255,255,0.1);
-      white-space: nowrap;
+      border: 1px solid rgba(255,255,255,0.1); white-space: nowrap;
     }
-
-    /* Pulsing dot */
     #scan-status::before {
-      content: '';
-      display: inline-block; width: 6px; height: 6px;
-      border-radius: 50%; background: var(--accent);
-      margin-right: 8px; vertical-align: middle;
-      animation: blink 1.2s ease-in-out infinite;
+      content: ''; display: inline-block;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent); margin-right: 8px;
+      vertical-align: middle; animation: blink 1.2s ease-in-out infinite;
     }
 
     @keyframes blink {
@@ -167,7 +136,6 @@
       50% { opacity: 0.2; }
     }
 
-    /* Manual override */
     #manual-btn {
       position: absolute; bottom: 4.5rem; left: 50%;
       transform: translateX(-50%);
@@ -175,21 +143,17 @@
       color: var(--muted); background: transparent;
       border: 1px solid rgba(255,255,255,0.1);
       padding: 0.4rem 1rem; border-radius: 50px; cursor: pointer;
-      pointer-events: all; transition: color 0.2s;
-      white-space: nowrap;
+      pointer-events: all; transition: color 0.2s; white-space: nowrap;
     }
-
     #manual-btn:hover { color: var(--accent); border-color: var(--accent); }
 
     /* ── Success overlay ── */
     #success {
-      display: none;
-      position: fixed; inset: 0; z-index: 200;
+      display: none; position: fixed; inset: 0; z-index: 200;
       background: rgba(0,0,0,0.88); backdrop-filter: blur(12px);
       flex-direction: column; align-items: center; justify-content: center;
       text-align: center; gap: 1.2rem; padding: 2rem;
     }
-
     #success.show { display: flex; animation: fadeIn 0.4s ease; }
 
     @keyframes fadeIn {
@@ -200,15 +164,12 @@
     .success-emoji { font-size: 4rem; animation: bounce 0.6s ease; }
 
     @keyframes bounce {
-      0% { transform: scale(0); }
-      60% { transform: scale(1.2); }
+      0%   { transform: scale(0); }
+      60%  { transform: scale(1.2); }
       100% { transform: scale(1); }
     }
 
-    #success h2 {
-      font-size: 2.5rem; font-weight: 800;
-      letter-spacing: -0.03em;
-    }
+    #success h2 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.03em; }
 
     .points-badge {
       background: var(--accent); color: #0a0a0f;
@@ -227,17 +188,17 @@
     .btn-continue {
       background: transparent; color: var(--text);
       font-family: 'Syne', sans-serif; font-weight: 700;
-      font-size: 0.9rem; letter-spacing: 0.05em;
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 50px; padding: 0.8rem 2rem;
-      cursor: pointer; margin-top: 0.5rem;
-      transition: border-color 0.2s, color 0.2s;
+      font-size: 0.9rem; border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 50px; padding: 0.8rem 2rem; cursor: pointer;
+      margin-top: 0.5rem; transition: border-color 0.2s, color 0.2s;
     }
-
     .btn-continue:hover { border-color: var(--accent); color: var(--accent); }
 
-    /* A-Frame fullscreen */
-    a-scene { position: fixed; inset: 0; z-index: 10; }
+    /* AR container fills viewport */
+    #ar-container {
+      position: fixed; inset: 0; z-index: 10; display: none;
+    }
+    #ar-container.active { display: block; }
   </style>
 </head>
 <body>
@@ -259,7 +220,7 @@
     <button class="btn-primary" id="start-btn">Open Camera</button>
   </div>
 
-  <!-- AR overlay UI -->
+  <!-- AR overlay UI (rendered on top of camera) -->
   <div id="ar-ui">
     <div id="scan-frame">
       <div class="corner tl"></div>
@@ -282,97 +243,117 @@
     <button class="btn-continue" onclick="window.location.href='index.html'">Back to Demos</button>
   </div>
 
-  <!-- A-Frame AR Scene (hidden until camera opens) -->
-  <a-scene
-    id="ar-scene"
-    style="display:none"
-    embedded
-    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
-    renderer="logarithmicDepthBuffer: true; antialias: true;"
-    vr-mode-ui="enabled: false"
-  >
-    <a-marker
-      id="hiro-marker"
-      preset="hiro"
-      emitevents="true"
-      smooth="true"
-      smooth-count="5"
-      smooth-tolerance="0.01"
-      smooth-threshold="2"
-    >
-      <!-- Spinning cube on top of marker -->
-      <a-entity id="ar-object">
-        <a-box
-          position="0 0.5 0"
-          rotation="0 0 0"
-          scale="0.6 0.6 0.6"
-          color="#00f5a0"
-          opacity="0.9"
-          animation="property: rotation; to: 360 360 0; loop: true; dur: 3000; easing: linear"
-        ></a-box>
-        <!-- Glow ring -->
-        <a-torus
-          position="0 0.05 0"
-          rotation="90 0 0"
-          radius="0.5"
-          radius-tubular="0.02"
-          color="#00f5a0"
-          opacity="0.4"
-          animation="property: rotation; from: 90 0 0; to: 90 360 0; loop: true; dur: 4000; easing: linear"
-        ></a-torus>
-      </a-entity>
-    </a-marker>
-    <a-entity camera></a-entity>
-  </a-scene>
+  <!-- AR.js scripts — loaded but a-scene only injected on button click -->
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+  <!-- a-scene will be injected here -->
+  <div id="ar-container"></div>
 
   <script>
-    const preScan  = document.getElementById('pre-scan');
-    const arUi     = document.getElementById('ar-ui');
-    const arScene  = document.getElementById('ar-scene');
-    const scanFrame = document.getElementById('scan-frame');
-    const scanStatus = document.getElementById('scan-status');
-    const successEl = document.getElementById('success');
-    const startBtn  = document.getElementById('start-btn');
-    const manualBtn = document.getElementById('manual-btn');
+    const preScan     = document.getElementById('pre-scan');
+    const arUi        = document.getElementById('ar-ui');
+    const arContainer = document.getElementById('ar-container');
+    const scanFrame   = document.getElementById('scan-frame');
+    const scanStatus  = document.getElementById('scan-status');
+    const successEl   = document.getElementById('success');
+    const startBtn    = document.getElementById('start-btn');
+    const manualBtn   = document.getElementById('manual-btn');
 
-    let lockTimer = null;
+    let lockTimer    = null;
     let successShown = false;
 
     function showSuccess() {
       if (successShown) return;
       successShown = true;
       scanFrame.classList.add('detected');
-      setTimeout(() => {
-        successEl.classList.add('show');
-      }, 400);
+      setTimeout(() => successEl.classList.add('show'), 400);
     }
 
-    startBtn.addEventListener('click', () => {
-      preScan.style.display = 'none';
-      arScene.style.display = 'block';
-      arUi.classList.add('active');
-    });
-
-    manualBtn.addEventListener('click', showSuccess);
-
-    // Marker events
-    document.addEventListener('DOMContentLoaded', () => {
+    function attachMarkerEvents() {
       const marker = document.getElementById('hiro-marker');
+      if (!marker) {
+        console.warn('Marker element not found, retrying in 500ms…');
+        setTimeout(attachMarkerEvents, 500);
+        return;
+      }
+
+      console.log('Attaching marker events to:', marker);
 
       marker.addEventListener('markerFound', () => {
+        console.log('markerFound fired');
         scanStatus.textContent = 'Marker detected!';
         scanFrame.classList.add('detected');
-        // Lock for ~1s then trigger success
+        clearTimeout(lockTimer);
         lockTimer = setTimeout(showSuccess, 1000);
       });
 
       marker.addEventListener('markerLost', () => {
+        console.log('markerLost fired');
         if (successShown) return;
         clearTimeout(lockTimer);
         scanStatus.textContent = 'Looking for marker…';
         scanFrame.classList.remove('detected');
       });
+    }
+
+    startBtn.addEventListener('click', () => {
+      preScan.style.display = 'none';
+      arUi.classList.add('active');
+      arContainer.classList.add('active');
+
+      // Inject a-scene into the DOM — this triggers AR.js + camera init
+      arContainer.innerHTML = `
+        <a-scene
+          embedded
+          arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+          renderer="logarithmicDepthBuffer: true; antialias: true;"
+          vr-mode-ui="enabled: false"
+        >
+          <a-marker
+            id="hiro-marker"
+            preset="hiro"
+            emitevents="true"
+            smooth="true"
+            smooth-count="5"
+            smooth-tolerance="0.01"
+            smooth-threshold="2"
+          >
+            <a-entity>
+              <a-box
+                position="0 0.5 0"
+                scale="0.6 0.6 0.6"
+                color="#00f5a0"
+                opacity="0.9"
+                animation="property: rotation; to: 360 360 0; loop: true; dur: 3000; easing: linear"
+              ></a-box>
+              <a-torus
+                position="0 0.05 0"
+                rotation="90 0 0"
+                radius="0.5"
+                radius-tubular="0.02"
+                color="#00f5a0"
+                opacity="0.4"
+                animation="property: rotation; from: 90 0 0; to: 90 360 0; loop: true; dur: 4000; easing: linear"
+              ></a-torus>
+            </a-entity>
+          </a-marker>
+          <a-entity camera></a-entity>
+        </a-scene>
+      `;
+
+      // Attach events once a-scene reports loaded
+      const scene = arContainer.querySelector('a-scene');
+      scene.addEventListener('loaded', () => {
+        console.log('A-Frame scene loaded — attaching marker events');
+        attachMarkerEvents();
+      });
+
+      // Safety fallback if 'loaded' already fired or was missed
+      setTimeout(attachMarkerEvents, 3000);
     });
+
+    manualBtn.addEventListener('click', showSuccess);
   </script>
 
 </body>
