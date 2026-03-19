@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GeoQuest — Image Tracking Demo</title>
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent: #f5a623;
+      --bg: #0a0a0f;
+      --text: #e8e8f0;
+      --muted: #666680;
+    }
+
+    body { font-family: 'Syne', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
+
+    /* ── Pre-scan screen ── */
+    #pre-scan {
+      position: fixed; inset: 0; z-index: 100;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 2rem; text-align: center; gap: 1.5rem;
+    }
+
+    #pre-scan::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(245,166,35,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(245,166,35,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    .back-btn {
+      position: absolute; top: 1.5rem; left: 1.5rem;
+      font-family: 'DM Mono', monospace; font-size: 0.75rem;
+      color: var(--muted); text-decoration: none;
+      letter-spacing: 0.05em; transition: color 0.2s;
+    }
+    .back-btn:hover { color: var(--accent); }
+
+    .demo-tag {
+      font-family: 'DM Mono', monospace; font-size: 0.7rem;
+      letter-spacing: 0.2em; color: var(--accent);
+      text-transform: uppercase; opacity: 0.8;
+    }
+
+    #pre-scan h1 {
+      font-size: 2.5rem; font-weight: 800;
+      letter-spacing: -0.03em; line-height: 1.1;
+    }
+
+    #pre-scan h1 span { color: var(--accent); }
+
+    .instruction {
+      font-family: 'DM Mono', monospace; font-size: 0.85rem;
+      color: var(--muted); max-width: 320px; line-height: 1.7;
+    }
+
+    .image-preview {
+      width: 180px; height: 130px;
+      border: 2px solid var(--accent);
+      border-radius: 12px; overflow: hidden;
+      position: relative;
+      animation: pulse-border 2s ease-in-out infinite;
+    }
+
+    .image-preview img {
+      width: 100%; height: 100%; object-fit: cover; opacity: 0.85;
+    }
+
+    @keyframes pulse-border {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245,166,35,0.4); }
+      50% { box-shadow: 0 0 0 8px rgba(245,166,35,0); }
+    }
+
+    .tips {
+      font-family: 'DM Mono', monospace; font-size: 0.72rem;
+      color: var(--muted); display: flex; flex-direction: column; gap: 0.4rem;
+    }
+    .tips span::before { content: '→ '; color: var(--accent); }
+
+    /* Loading bar for NFT descriptors */
+    #loading-bar {
+      display: none;
+      width: 240px; flex-direction: column; gap: 0.5rem; align-items: center;
+    }
+    #loading-bar.show { display: flex; }
+
+    .loading-label {
+      font-family: 'DM Mono', monospace; font-size: 0.7rem;
+      color: var(--muted); letter-spacing: 0.05em;
+    }
+
+    .bar-track {
+      width: 100%; height: 3px;
+      background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%; width: 0%;
+      background: var(--accent); border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+
+    .btn-primary {
+      background: var(--accent); color: #0a0a0f;
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: 1rem; letter-spacing: 0.02em;
+      border: none; border-radius: 50px;
+      padding: 0.9rem 2.5rem; cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(245,166,35,0.3);
+    }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* ── AR overlay ── */
+    #ar-ui {
+      display: none; position: fixed; inset: 0; z-index: 50;
+      pointer-events: none;
+    }
+    #ar-ui.active { display: block; }
+
+    #scan-status {
+      position: absolute; bottom: 1.5rem; left: 50%;
+      transform: translateX(-50%);
+      font-family: 'DM Mono', monospace; font-size: 0.75rem;
+      letter-spacing: 0.1em; color: var(--text);
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
+      padding: 0.5rem 1.2rem; border-radius: 50px;
+      border: 1px solid rgba(255,255,255,0.1);
+      white-space: nowrap;
+    }
+
+    #scan-status::before {
+      content: ''; display: inline-block;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent); margin-right: 8px;
+      vertical-align: middle;
+      animation: blink 1.2s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+
+    #manual-btn {
+      position: absolute; bottom: 4.5rem; left: 50%;
+      transform: translateX(-50%);
+      font-family: 'DM Mono', monospace; font-size: 0.72rem;
+      color: var(--muted); background: transparent;
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 0.4rem 1rem; border-radius: 50px;
+      cursor: pointer; pointer-events: all;
+      transition: color 0.2s; white-space: nowrap;
+    }
+    #manual-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* ── Success overlay ── */
+    #success {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.88); backdrop-filter: blur(12px);
+      flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; gap: 1.2rem; padding: 2rem;
+    }
+    #success.show { display: flex; animation: fadeIn 0.4s ease; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    .success-emoji { font-size: 4rem; animation: bounce 0.6s ease; }
+
+    @keyframes bounce {
+      0% { transform: scale(0); }
+      60% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+    #success h2 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.03em; }
+
+    .points-badge {
+      background: var(--accent); color: #0a0a0f;
+      font-family: 'DM Mono', monospace; font-weight: 500;
+      font-size: 1.1rem; padding: 0.5rem 1.5rem;
+      border-radius: 50px; letter-spacing: 0.05em;
+    }
+
+    .fun-fact {
+      font-family: 'DM Mono', monospace; font-size: 0.78rem;
+      color: var(--muted); max-width: 300px; line-height: 1.7;
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 1rem 1.2rem; border-radius: 12px;
+    }
+
+    .btn-continue {
+      background: transparent; color: var(--text);
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: 0.9rem; letter-spacing: 0.05em;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 50px; padding: 0.8rem 2rem;
+      cursor: pointer; margin-top: 0.5rem;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .btn-continue:hover { border-color: var(--accent); color: var(--accent); }
+
+    a-scene { position: fixed; inset: 0; z-index: 10; }
+
+    /* NFT loader styles (AR.js injects these) */
+    .arjs-loader {
+      height: 100%; width: 100%;
+      position: absolute; top: 0; left: 0;
+      background-color: rgba(10,10,15,0.9); z-index: 9999;
+      display: flex; justify-content: center; align-items: center;
+    }
+    .arjs-loader div {
+      text-align: center; font-size: 1.25em; color: white;
+      font-family: 'DM Mono', monospace;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Pre-scan screen -->
+  <div id="pre-scan">
+    <a href="index.html" class="back-btn">← Back</a>
+    <p class="demo-tag">Demo 02 · Image Tracking</p>
+    <h1>Scan the<br/><span>Image</span></h1>
+    <div class="image-preview">
+      <img src="https://raw.githubusercontent.com/AR-js-org/AR.js/master/aframe/examples/image-tracking/nft/trex-image-big.jpeg" alt="T-Rex target" />
+    </div>
+    <p class="instruction">Point your camera at this T-Rex image. The AR object will anchor to its surface.</p>
+    <div class="tips">
+      <span>Print or display on screen</span>
+      <span>Keep full image in view</span>
+      <span>NFT descriptors load on start</span>
+    </div>
+    <div id="loading-bar">
+      <span class="loading-label">Loading image descriptors…</span>
+      <div class="bar-track"><div class="bar-fill" id="bar-fill"></div></div>
+    </div>
+    <button class="btn-primary" id="start-btn">Open Camera</button>
+  </div>
+
+  <!-- AR overlay -->
+  <div id="ar-ui">
+    <div id="scan-status">Scanning for image…</div>
+    <button id="manual-btn">I found it (manual)</button>
+  </div>
+
+  <!-- Success overlay -->
+  <div id="success">
+    <div class="success-emoji">🎉</div>
+    <h2>You found it!</h2>
+    <div class="points-badge">+50 points</div>
+    <div class="fun-fact">
+      NFT (Natural Feature Tracking) lets AR.js track real-world images by analyzing their unique visual features — no special marker required.
+    </div>
+    <button class="btn-continue" onclick="window.location.href='index.html'">Back to Demos</button>
+  </div>
+
+  <!-- A-Frame NFT Scene -->
+  <a-scene
+    id="ar-scene"
+    style="display:none"
+    vr-mode-ui="enabled: false"
+    renderer="logarithmicDepthBuffer: true; precision: medium;"
+    embedded
+    arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
+  >
+    <a-nft
+      id="nft-target"
+      type="nft"
+      url="https://raw.githack.com/AR-js-org/AR.js/master/aframe/examples/image-tracking/nft/trex/trex-image/trex"
+      smooth="true"
+      smoothCount="10"
+      smoothTolerance=".01"
+      smoothThreshold="5"
+      emitevents="true"
+    >
+      <!-- Spinning sphere anchored to image -->
+      <a-sphere
+        position="0 150 0"
+        scale="60 60 60"
+        color="#f5a623"
+        opacity="0.9"
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 3000; easing: linear"
+      ></a-sphere>
+      <!-- Orbit ring -->
+      <a-torus
+        position="0 150 0"
+        rotation="0 0 0"
+        radius="80"
+        radius-tubular="4"
+        color="#f5a623"
+        opacity="0.35"
+        animation="property: rotation; to: 0 360 360; loop: true; dur: 5000; easing: linear"
+      ></a-torus>
+    </a-nft>
+    <a-entity camera></a-entity>
+  </a-scene>
+
+  <script>
+    const preScan    = document.getElementById('pre-scan');
+    const arUi       = document.getElementById('ar-ui');
+    const arScene    = document.getElementById('ar-scene');
+    const scanStatus = document.getElementById('scan-status');
+    const successEl  = document.getElementById('success');
+    const startBtn   = document.getElementById('start-btn');
+    const manualBtn  = document.getElementById('manual-btn');
+    const loadingBar = document.getElementById('loading-bar');
+    const barFill    = document.getElementById('bar-fill');
+
+    let successShown = false;
+    let lockTimer    = null;
+
+    function showSuccess() {
+      if (successShown) return;
+      successShown = true;
+      setTimeout(() => successEl.classList.add('show'), 300);
+    }
+
+    startBtn.addEventListener('click', () => {
+      preScan.style.display = 'none';
+      arScene.style.display = 'block';
+      arUi.classList.add('active');
+
+      // Simulate loading bar for NFT descriptor fetch
+      loadingBar.classList.add('show');
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress >= 100) { progress = 100; clearInterval(interval); }
+        barFill.style.width = progress + '%';
+      }, 300);
+    });
+
+    manualBtn.addEventListener('click', showSuccess);
+
+    // NFT tracking events
+    document.addEventListener('DOMContentLoaded', () => {
+      const nft = document.getElementById('nft-target');
+
+      nft.addEventListener('targetFound', () => {
+        scanStatus.textContent = 'Image detected!';
+        lockTimer = setTimeout(showSuccess, 1000);
+      });
+
+      nft.addEventListener('targetLost', () => {
+        if (successShown) return;
+        clearTimeout(lockTimer);
+        scanStatus.textContent = 'Scanning for image…';
+      });
+    });
+  </script>
+
+</body>
+</html>
