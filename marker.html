@@ -199,6 +199,25 @@
       position: fixed; inset: 0; z-index: 10; display: none;
     }
     #ar-container.active { display: block; }
+
+    /* Force AR.js canvas + video to fit the screen without zooming */
+    #ar-container canvas,
+    #ar-container video {
+      position: fixed !important;
+      top: 0 !important; left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      object-fit: cover !important;
+      max-width: none !important;
+      max-height: none !important;
+    }
+
+    #ar-container a-scene {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+    }
   </style>
 </head>
 <body>

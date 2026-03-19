@@ -4,9 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GeoQuest — Location Demo</title>
-  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-  <script src="https://unpkg.com/aframe-look-at-component@1.0.0/dist/aframe-look-at-component.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -20,21 +17,22 @@
 
     body { font-family: 'Syne', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
 
-    /* ── Pre-scan screen ── */
-    #pre-scan {
-      position: fixed; inset: 0; z-index: 100;
-      background: var(--bg);
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: 2rem; text-align: center; gap: 1.5rem;
-    }
-
-    #pre-scan::before {
-      content: ''; position: absolute; inset: 0;
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
       background-image:
         linear-gradient(rgba(123,97,255,0.03) 1px, transparent 1px),
         linear-gradient(90deg, rgba(123,97,255,0.03) 1px, transparent 1px);
       background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    /* ── Pre-scan screen ── */
+    #pre-scan {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 2rem; text-align: center; gap: 1.5rem;
     }
 
     .back-btn {
@@ -62,22 +60,16 @@
       color: var(--muted); max-width: 320px; line-height: 1.7;
     }
 
-    /* Config display */
     .config-box {
-      border: 1px solid rgba(123,97,255,0.25);
-      border-radius: 12px; padding: 1rem 1.5rem;
-      font-family: 'DM Mono', monospace; font-size: 0.75rem;
-      color: var(--muted); text-align: left;
-      background: rgba(123,97,255,0.05);
-      width: 100%; max-width: 300px;
+      border: 1px solid rgba(123,97,255,0.25); border-radius: 12px;
+      padding: 1rem 1.5rem; font-family: 'DM Mono', monospace;
+      font-size: 0.75rem; color: var(--muted); text-align: left;
+      background: rgba(123,97,255,0.05); width: 100%; max-width: 300px;
     }
-
     .config-box .config-title {
       color: var(--accent); font-size: 0.65rem;
-      letter-spacing: 0.15em; text-transform: uppercase;
-      margin-bottom: 0.6rem;
+      letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.6rem;
     }
-
     .config-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.2rem 0; }
     .config-row .key { color: var(--muted); }
     .config-row .val { color: var(--text); }
@@ -102,12 +94,11 @@
 
     /* ── AR overlay ── */
     #ar-ui {
-      display: none; position: fixed; inset: 0;
-      z-index: 50; pointer-events: none;
+      display: none; position: fixed; inset: 0; z-index: 50;
+      pointer-events: none;
     }
     #ar-ui.active { display: block; }
 
-    /* GPS status pill */
     #gps-status {
       position: absolute; top: 1.5rem; left: 50%;
       transform: translateX(-50%);
@@ -121,44 +112,41 @@
 
     .gps-dot {
       width: 6px; height: 6px; border-radius: 50%;
-      background: var(--muted);
-      transition: background 0.4s;
+      background: var(--muted); transition: background 0.4s;
+      flex-shrink: 0;
     }
-    .gps-dot.active { background: #00f5a0; animation: blink 1.2s infinite; }
-    .gps-dot.near { background: var(--accent); animation: blink 0.6s infinite; }
+    .gps-dot.active  { background: #00f5a0; animation: blink 1.2s infinite; }
+    .gps-dot.near    { background: var(--accent); animation: blink 0.6s infinite; }
 
     @keyframes blink {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.2; }
     }
 
-    /* Distance indicator */
+    /* Distance card */
     #distance-display {
-      position: absolute; bottom: 5rem; left: 50%;
+      position: absolute; bottom: 5.5rem; left: 50%;
       transform: translateX(-50%);
       font-family: 'DM Mono', monospace; font-size: 0.72rem;
       color: var(--text); text-align: center;
       background: rgba(0,0,0,0.65); backdrop-filter: blur(8px);
-      padding: 0.6rem 1.2rem; border-radius: 12px;
+      padding: 0.6rem 1.4rem; border-radius: 12px;
       border: 1px solid rgba(255,255,255,0.08);
-      white-space: nowrap; display: none;
+      display: none;
     }
-
     #distance-display.show { display: block; }
-
     .dist-label { color: var(--muted); font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; }
-    .dist-value { font-size: 1.2rem; color: var(--text); margin-top: 0.2rem; }
-    .dist-value.near { color: var(--accent); }
+    .dist-value { font-size: 1.4rem; font-weight: 700; color: var(--text); margin-top: 0.15rem; }
+    .dist-value.near { color: #00f5a0; }
 
     /* Progress ring */
-    .progress-ring-wrap {
-      position: absolute; top: 4rem; right: 1.5rem;
+    #ring-wrap {
+      position: absolute; top: 4.5rem; right: 1.5rem;
       width: 56px; height: 56px; display: none;
     }
-    .progress-ring-wrap.show { display: block; }
-
-    .progress-ring-wrap svg { transform: rotate(-90deg); }
-    .ring-bg { fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 3; }
+    #ring-wrap.show { display: block; }
+    #ring-wrap svg { transform: rotate(-90deg); }
+    .ring-bg   { fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 3; }
     .ring-fill {
       fill: none; stroke: var(--accent); stroke-width: 3;
       stroke-linecap: round;
@@ -173,19 +161,17 @@
       letter-spacing: 0.1em; color: var(--text);
       background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
       padding: 0.5rem 1.2rem; border-radius: 50px;
-      border: 1px solid rgba(255,255,255,0.1);
-      white-space: nowrap;
+      border: 1px solid rgba(255,255,255,0.1); white-space: nowrap;
     }
 
     #manual-btn {
-      position: absolute; bottom: 8rem; left: 50%;
+      position: absolute; bottom: 4.5rem; left: 50%;
       transform: translateX(-50%);
       font-family: 'DM Mono', monospace; font-size: 0.72rem;
       color: var(--muted); background: transparent;
       border: 1px solid rgba(255,255,255,0.1);
-      padding: 0.4rem 1rem; border-radius: 50px;
-      cursor: pointer; pointer-events: all;
-      transition: color 0.2s; white-space: nowrap;
+      padding: 0.4rem 1rem; border-radius: 50px; cursor: pointer;
+      pointer-events: all; transition: color 0.2s; white-space: nowrap;
     }
     #manual-btn:hover { color: var(--accent); border-color: var(--accent); }
 
@@ -206,8 +192,8 @@
     .success-emoji { font-size: 4rem; animation: bounce 0.6s ease; }
 
     @keyframes bounce {
-      0% { transform: scale(0); }
-      60% { transform: scale(1.2); }
+      0%   { transform: scale(0); }
+      60%  { transform: scale(1.2); }
       100% { transform: scale(1); }
     }
 
@@ -231,13 +217,35 @@
       background: transparent; color: var(--text);
       font-family: 'Syne', sans-serif; font-weight: 700;
       font-size: 0.9rem; border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 50px; padding: 0.8rem 2rem;
-      cursor: pointer; margin-top: 0.5rem;
-      transition: border-color 0.2s, color 0.2s;
+      border-radius: 50px; padding: 0.8rem 2rem; cursor: pointer;
+      margin-top: 0.5rem; transition: border-color 0.2s, color 0.2s;
     }
     .btn-continue:hover { border-color: var(--accent); color: var(--accent); }
 
-    a-scene { position: fixed; inset: 0; z-index: 10; }
+    /* AR container */
+    #ar-container {
+      position: fixed; inset: 0; z-index: 10; display: none;
+    }
+    #ar-container.active { display: block; }
+
+    /* Force AR.js canvas + video to fill the screen without zooming */
+    #ar-container canvas,
+    #ar-container video {
+      position: fixed !important;
+      top: 0 !important; left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      object-fit: cover !important;
+      max-width: none !important;
+      max-height: none !important;
+    }
+
+    #ar-container a-scene {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+    }
   </style>
 </head>
 <body>
@@ -255,10 +263,10 @@
       <div class="config-row"><span class="key">radius</span><span class="val" id="cfg-radius">—</span></div>
     </div>
 
-    <p class="instruction">Walk toward the target coordinates. An AR object will appear anchored there. Get within range to unlock.</p>
+    <p class="instruction">Walk toward the target. An AR object appears anchored there. Get within range to unlock.</p>
     <div class="tips">
       <span>Enable GPS / Location Services</span>
-      <span>Best outdoors or near windows</span>
+      <span>Best near windows or outdoors</span>
       <span>Chrome on Android recommended</span>
     </div>
     <button class="btn-primary" id="start-btn">Start &amp; Enable GPS</button>
@@ -271,15 +279,14 @@
       <span id="gps-label">Waiting for GPS…</span>
     </div>
 
-    <!-- Progress ring -->
-    <div class="progress-ring-wrap" id="ring-wrap">
+    <div id="ring-wrap">
       <svg width="56" height="56" viewBox="0 0 56 56">
-        <circle class="ring-bg" cx="28" cy="28" r="22"/>
+        <circle class="ring-bg"   cx="28" cy="28" r="22"/>
         <circle class="ring-fill" id="ring-fill" cx="28" cy="28" r="22"/>
       </svg>
     </div>
 
-    <div class="distance-display" id="distance-display">
+    <div id="distance-display">
       <div class="dist-label">Distance to target</div>
       <div class="dist-value" id="dist-value">— m</div>
     </div>
@@ -294,55 +301,18 @@
     <h2>You found it!</h2>
     <div class="points-badge">+50 points</div>
     <div class="fun-fact">
-      You're standing at the target location. In the full GeoQuest experience, this triggers a mission unlock and reveals the next clue.
+      You're at the target location. In the full GeoQuest experience, this triggers a mission unlock and reveals the next clue.
     </div>
     <button class="btn-continue" onclick="window.location.href='index.html'">Back to Demos</button>
   </div>
 
-  <!-- A-Frame Location-based AR Scene -->
-  <a-scene
-    id="ar-scene"
-    style="display:none"
-    vr-mode-ui="enabled: false"
-    arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
-    renderer="antialias: true; alpha: true"
-    embedded
-  >
-    <!-- AR object placed at target GPS coordinates -->
-    <a-entity id="ar-poi" visible="false">
-      <!-- Floating gem shape -->
-      <a-octahedron
-        id="ar-gem"
-        scale="8 8 8"
-        color="#7b61ff"
-        opacity="0.92"
-        look-at="[gps-camera]"
-        animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear"
-        animation__float="property: position; from: 0 12 0; to: 0 16 0; loop: true; dur: 2000; easing: easeInOutSine; dir: alternate"
-      ></a-octahedron>
-      <!-- Glow ring beneath -->
-      <a-torus
-        position="0 2 0"
-        rotation="90 0 0"
-        radius="10"
-        radius-tubular="0.4"
-        color="#7b61ff"
-        opacity="0.3"
-        animation="property: rotation; from: 90 0 0; to: 90 360 0; loop: true; dur: 3000; easing: linear"
-      ></a-torus>
-      <!-- Label -->
-      <a-text
-        value="GeoQuest"
-        look-at="[gps-camera]"
-        scale="20 20 20"
-        position="0 22 0"
-        align="center"
-        color="#ffffff"
-      ></a-text>
-    </a-entity>
+  <!-- AR.js scripts -->
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <script src="https://unpkg.com/aframe-look-at-component@1.0.0/dist/aframe-look-at-component.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
 
-    <a-camera id="ar-camera" gps-camera rotation-reader></a-camera>
-  </a-scene>
+  <!-- a-scene injected here on button click -->
+  <div id="ar-container"></div>
 
   <script>
     // ═══════════════════════════════════════════════
@@ -355,44 +325,43 @@
     };
     // ═══════════════════════════════════════════════
 
-    // Populate config display
+    // Populate config display on pre-scan screen
     document.getElementById('cfg-lat').textContent    = CONFIG.latitude;
     document.getElementById('cfg-lng').textContent    = CONFIG.longitude;
     document.getElementById('cfg-radius').textContent = CONFIG.proximityRadius + ' m';
 
-    // DOM refs
-    const preScan     = document.getElementById('pre-scan');
-    const arUi        = document.getElementById('ar-ui');
-    const arScene     = document.getElementById('ar-scene');
-    const successEl   = document.getElementById('success');
-    const startBtn    = document.getElementById('start-btn');
-    const manualBtn   = document.getElementById('manual-btn');
-    const scanStatus  = document.getElementById('scan-status');
-    const gpsLabel    = document.getElementById('gps-label');
-    const gpsDot      = document.getElementById('gps-dot');
-    const distDisplay = document.getElementById('distance-display');
-    const distValue   = document.getElementById('dist-value');
-    const ringFill    = document.getElementById('ring-fill');
-    const ringWrap    = document.getElementById('ring-wrap');
+    const preScan      = document.getElementById('pre-scan');
+    const arUi         = document.getElementById('ar-ui');
+    const arContainer  = document.getElementById('ar-container');
+    const successEl    = document.getElementById('success');
+    const startBtn     = document.getElementById('start-btn');
+    const manualBtn    = document.getElementById('manual-btn');
+    const scanStatus   = document.getElementById('scan-status');
+    const gpsLabel     = document.getElementById('gps-label');
+    const gpsDot       = document.getElementById('gps-dot');
+    const distDisplay  = document.getElementById('distance-display');
+    const distValue    = document.getElementById('dist-value');
+    const ringFill     = document.getElementById('ring-fill');
+    const ringWrap     = document.getElementById('ring-wrap');
 
     let successShown = false;
     let watchId      = null;
 
     // Haversine distance in meters
     function haversine(lat1, lon1, lat2, lon2) {
-      const R = 6371000;
+      const R  = 6371000;
       const φ1 = lat1 * Math.PI / 180;
       const φ2 = lat2 * Math.PI / 180;
       const Δφ = (lat2 - lat1) * Math.PI / 180;
       const Δλ = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(Δφ/2)**2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2)**2;
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      const a  = Math.sin(Δφ/2)**2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
-    function updateProximityRing(distance) {
-      const maxDist = CONFIG.proximityRadius * 5; // ring fills as you close in
-      const progress = Math.max(0, Math.min(1, 1 - (distance / maxDist)));
-      const circumference = 138; // 2π × r=22
+    function updateRing(distance) {
+      const maxDist    = CONFIG.proximityRadius * 6;
+      const progress   = Math.max(0, Math.min(1, 1 - (distance / maxDist)));
+      const circumference = 138;
       ringFill.style.strokeDashoffset = circumference * (1 - progress);
     }
 
@@ -405,18 +374,16 @@
 
     function onPosition(pos) {
       const { latitude, longitude } = pos.coords;
-      const distance = haversine(latitude, longitude, CONFIG.latitude, CONFIG.longitude);
+      const distance   = haversine(latitude, longitude, CONFIG.latitude, CONFIG.longitude);
       const distRounded = Math.round(distance);
 
-      // Update GPS status
       gpsDot.classList.add('active');
-      gpsLabel.textContent = `GPS locked`;
+      gpsLabel.textContent = 'GPS locked';
 
-      // Show distance
       distDisplay.classList.add('show');
       ringWrap.classList.add('show');
       distValue.textContent = distRounded + ' m';
-      updateProximityRing(distance);
+      updateRing(distance);
 
       if (distance <= CONFIG.proximityRadius) {
         distValue.classList.add('near');
@@ -424,47 +391,78 @@
         scanStatus.textContent = '✓ You\'re in range!';
         showSuccess();
       } else {
-        scanStatus.textContent = `${distRounded}m away — keep walking`;
         distValue.classList.remove('near');
+        scanStatus.textContent = `${distRounded}m away — keep walking`;
       }
     }
 
-    function onError(err) {
-      gpsLabel.textContent = 'GPS error';
-      scanStatus.textContent = 'Location access denied — use manual button';
+    function onGPSError(err) {
+      gpsLabel.textContent = 'GPS unavailable';
+      scanStatus.textContent = 'Location denied — use manual button';
       console.warn('GPS error:', err.message);
-    }
-
-    function placeARObject() {
-      // Set the AR POI at CONFIG coordinates once scene is ready
-      const poi = document.getElementById('ar-poi');
-      const camera = document.getElementById('ar-camera');
-
-      // We use gps-entity-place on the entity
-      poi.setAttribute('gps-entity-place', `latitude: ${CONFIG.latitude}; longitude: ${CONFIG.longitude}`);
-      poi.setAttribute('visible', 'true');
     }
 
     startBtn.addEventListener('click', () => {
       preScan.style.display = 'none';
-      arScene.style.display = 'block';
       arUi.classList.add('active');
+      arContainer.classList.add('active');
 
-      // Place AR object
-      document.addEventListener('DOMContentLoaded', placeARObject);
-      // If DOM already loaded
-      if (document.readyState !== 'loading') placeARObject();
+      // Inject a-scene
+      arContainer.innerHTML = `
+        <a-scene
+          embedded
+          vr-mode-ui="enabled: false"
+          arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
+          renderer="antialias: true; alpha: true;"
+        >
+          <a-entity
+            id="ar-poi"
+            gps-entity-place="latitude: ${CONFIG.latitude}; longitude: ${CONFIG.longitude};"
+          >
+            <a-octahedron
+              scale="8 8 8"
+              color="#7b61ff"
+              opacity="0.92"
+              look-at="[gps-camera]"
+              animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear"
+              animation__float="property: position; from: 0 12 0; to: 0 18 0; loop: true; dur: 2000; easing: easeInOutSine; dir: alternate"
+            ></a-octahedron>
+            <a-torus
+              position="0 2 0"
+              rotation="90 0 0"
+              radius="10"
+              radius-tubular="0.4"
+              color="#7b61ff"
+              opacity="0.3"
+              animation="property: rotation; from: 90 0 0; to: 90 360 0; loop: true; dur: 3000; easing: linear"
+            ></a-torus>
+            <a-text
+              value="GeoQuest"
+              look-at="[gps-camera]"
+              scale="20 20 20"
+              position="0 24 0"
+              align="center"
+              color="#ffffff"
+            ></a-text>
+          </a-entity>
+          <a-camera gps-camera rotation-reader></a-camera>
+        </a-scene>
+      `;
+
+      const scene = arContainer.querySelector('a-scene');
+      scene.addEventListener('loaded', () => {
+        console.log('A-Frame scene loaded');
+      });
 
       // Start GPS watch
       if ('geolocation' in navigator) {
-        watchId = navigator.geolocation.watchPosition(onPosition, onError, {
+        watchId = navigator.geolocation.watchPosition(onPosition, onGPSError, {
           enableHighAccuracy: true,
           maximumAge: 3000,
-          timeout: 10000
+          timeout: 10000,
         });
-        scanStatus.textContent = 'Acquiring GPS signal…';
       } else {
-        scanStatus.textContent = 'GPS not available — use manual button';
+        scanStatus.textContent = 'GPS not supported — use manual button';
       }
     });
 
