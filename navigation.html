@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GeoQuest — Navigation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent: #00f5a0;
+      --accent-mid: #f5c400;
+      --accent-near: #ff6b35;
+      --bg: #0a0a0f;
+      --text: #e8e8f0;
+      --muted: #666680;
+      --arrow-color: #ffffff;
+    }
+
+    html, body {
+      overflow: hidden !important;
+      width: 100% !important;
+      height: 100% !important;
+      margin: 0 !important;
+    }
+
+    body { font-family: 'Syne', sans-serif; background: var(--bg); color: var(--text); }
+
+    /* ─────────────────────────────────────────
+       SHARED: screen base
+    ───────────────────────────────────────── */
+    .screen {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 2rem; text-align: center; gap: 1.5rem;
+      background: var(--bg);
+    }
+
+    .screen.hidden { display: none; }
+
+    .screen::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,245,160,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,245,160,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    .back-btn {
+      position: absolute; top: 1.5rem; left: 1.5rem;
+      font-family: 'DM Mono', monospace; font-size: 0.75rem;
+      color: var(--muted); text-decoration: none;
+      letter-spacing: 0.05em; transition: color 0.2s;
+    }
+    .back-btn:hover { color: var(--accent); }
+
+    .demo-tag {
+      font-family: 'DM Mono', monospace; font-size: 0.7rem;
+      letter-spacing: 0.2em; color: var(--accent);
+      text-transform: uppercase; opacity: 0.8;
+    }
+
+    .screen h1 {
+      font-size: 2.5rem; font-weight: 800;
+      letter-spacing: -0.03em; line-height: 1.1;
+    }
+    .screen h1 span { color: var(--accent); }
+
+    .instruction {
+      font-family: 'DM Mono', monospace; font-size: 0.85rem;
+      color: var(--muted); max-width: 320px; line-height: 1.7;
+    }
+
+    .config-box {
+      border: 1px solid rgba(0,245,160,0.2); border-radius: 12px;
+      padding: 1rem 1.5rem; font-family: 'DM Mono', monospace;
+      font-size: 0.75rem; text-align: left;
+      background: rgba(0,245,160,0.04); width: 100%; max-width: 300px;
+    }
+    .config-title {
+      color: var(--accent); font-size: 0.65rem;
+      letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.6rem;
+    }
+    .config-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.2rem 0; }
+    .config-row .key { color: var(--muted); }
+    .config-row .val { color: var(--text); }
+
+    .tips {
+      font-family: 'DM Mono', monospace; font-size: 0.72rem;
+      color: var(--muted); display: flex; flex-direction: column; gap: 0.4rem;
+    }
+    .tips span::before { content: '→ '; color: var(--accent); }
+
+    .btn-primary {
+      background: var(--accent); color: #0a0a0f;
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: 1rem; border: none; border-radius: 50px;
+      padding: 0.9rem 2.5rem; cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,245,160,0.3);
+    }
+
+    /* ─────────────────────────────────────────
+       PERMISSION SCREEN (iOS compass)
+    ───────────────────────────────────────── */
+    .permission-icon {
+      font-size: 3.5rem;
+      animation: spin-slow 8s linear infinite;
+    }
+    @keyframes spin-slow {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    /* ─────────────────────────────────────────
+       CAMERA FEED
+    ───────────────────────────────────────── */
+    #camera-feed {
+      position: fixed; inset: 0; z-index: 1;
+      display: none;
+    }
+    #camera-feed.active { display: block; }
+
+    #camera-feed video {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      object-fit: cover;
+    }
+
+    /* Dark vignette over camera */
+    #camera-feed::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse at center,
+        transparent 40%,
+        rgba(0,0,0,0.55) 100%
+      );
+      pointer-events: none;
+    }
+
+    /* ─────────────────────────────────────────
+       HUD OVERLAY
+    ───────────────────────────────────────── */
+    #hud {
+      display: none;
+      position: fixed; inset: 0; z-index: 10;
+      pointer-events: none;
+    }
+    #hud.active { display: block; }
+
+    /* ── Top bar ── */
+    #hud-top {
+      position: absolute; top: 0; left: 0; right: 0;
+      padding: 1.2rem 1.2rem 0;
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .hud-pill {
+      font-family: 'DM Mono', monospace; font-size: 0.7rem;
+      letter-spacing: 0.08em; color: var(--text);
+      background: rgba(0,0,0,0.65); backdrop-filter: blur(10px);
+      padding: 0.45rem 0.9rem; border-radius: 50px;
+      border: 1px solid rgba(255,255,255,0.1);
+      display: flex; align-items: center; gap: 0.45rem;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--muted); flex-shrink: 0;
+      transition: background 0.4s;
+    }
+    .dot.active  { background: var(--accent); animation: blink 1.4s infinite; }
+    .dot.locked  { background: var(--accent); animation: none; }
+    .dot.compass { background: #7b61ff; animation: blink 1.4s infinite; }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.2; }
+    }
+
+    /* Compass heading readout */
+    #compass-readout {
+      font-family: 'DM Mono', monospace; font-size: 0.7rem;
+      color: var(--text);
+    }
+
+    /* ── Center arrow ── */
+    #arrow-wrap {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex; flex-direction: column;
+      align-items: center; gap: 1.2rem;
+    }
+
+    /* Outer HUD ring */
+    #arrow-ring {
+      position: relative;
+      width: 160px; height: 160px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.3);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.6s;
+    }
+
+    /* Tick marks on ring */
+    #arrow-ring::before {
+      content: '';
+      position: absolute; inset: 6px;
+      border-radius: 50%;
+      border: 1px dashed rgba(255,255,255,0.06);
+    }
+
+    /* Arrow SVG container — this rotates */
+    #arrow-rotate {
+      transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    #arrow-svg {
+      width: 64px; height: 64px;
+      filter: drop-shadow(0 0 8px var(--arrow-color));
+      transition: filter 0.6s;
+    }
+
+    /* Arrow path color transitions with distance */
+    #arrow-path {
+      fill: var(--arrow-color);
+      transition: fill 0.6s;
+    }
+
+    /* Distance label under arrow */
+    #dist-label {
+      font-family: 'DM Mono', monospace;
+      text-align: center;
+      line-height: 1.3;
+    }
+
+    #dist-meters {
+      font-size: 2.2rem; font-weight: 700;
+      color: var(--text);
+      transition: color 0.6s;
+      font-family: 'Syne', sans-serif;
+      letter-spacing: -0.03em;
+    }
+
+    #dist-unit {
+      font-size: 0.7rem; color: var(--muted);
+      letter-spacing: 0.1em; text-transform: uppercase;
+      font-family: 'DM Mono', monospace;
+    }
+
+    /* Proximity pulse ring — appears when close */
+    #proximity-pulse {
+      position: absolute; inset: -8px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+
+    #proximity-pulse.active {
+      opacity: 1;
+      animation: pulse-ring 1.5s ease-out infinite;
+    }
+
+    @keyframes pulse-ring {
+      0%   { transform: scale(1);    opacity: 0.8; }
+      100% { transform: scale(1.25); opacity: 0;   }
+    }
+
+    /* ── Status bar at bottom ── */
+    #hud-bottom {
+      position: absolute; bottom: 1.5rem; left: 50%;
+      transform: translateX(-50%);
+      display: flex; flex-direction: column;
+      align-items: center; gap: 0.6rem;
+    }
+
+    #nav-status {
+      font-family: 'DM Mono', monospace; font-size: 0.75rem;
+      letter-spacing: 0.08em; color: var(--text);
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
+      padding: 0.5rem 1.2rem; border-radius: 50px;
+      border: 1px solid rgba(255,255,255,0.1); white-space: nowrap;
+    }
+
+    #manual-btn {
+      font-family: 'DM Mono', monospace; font-size: 0.7rem;
+      color: var(--muted); background: transparent;
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 0.35rem 0.9rem; border-radius: 50px;
+      cursor: pointer; pointer-events: all;
+      transition: color 0.2s, border-color 0.2s; white-space: nowrap;
+    }
+    #manual-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* Compass unavailable state */
+    #compass-warn {
+      display: none;
+      font-family: 'DM Mono', monospace; font-size: 0.7rem;
+      color: var(--accent-near); letter-spacing: 0.05em;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
+      padding: 0.4rem 1rem; border-radius: 50px;
+      border: 1px solid rgba(255,107,53,0.3);
+    }
+    #compass-warn.show { display: block; }
+
+    /* ── Calibration nudge ── */
+    #calibrate-hint {
+      position: absolute; bottom: 9rem; left: 50%;
+      transform: translateX(-50%);
+      font-family: 'DM Mono', monospace; font-size: 0.68rem;
+      color: var(--muted); text-align: center;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
+      padding: 0.4rem 1rem; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.06);
+      white-space: nowrap; opacity: 0;
+      transition: opacity 0.5s;
+    }
+    #calibrate-hint.show { opacity: 1; }
+
+    /* ─────────────────────────────────────────
+       SUCCESS OVERLAY
+    ───────────────────────────────────────── */
+    #success {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.88); backdrop-filter: blur(12px);
+      flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; gap: 1.2rem; padding: 2rem;
+    }
+    #success.show { display: flex; animation: fadeIn 0.4s ease; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    .success-emoji { font-size: 4rem; animation: bounce 0.6s ease; }
+
+    @keyframes bounce {
+      0%   { transform: scale(0); }
+      60%  { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+    #success h2 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.03em; }
+
+    .points-badge {
+      background: var(--accent); color: #0a0a0f;
+      font-family: 'DM Mono', monospace; font-weight: 500;
+      font-size: 1.1rem; padding: 0.5rem 1.5rem;
+      border-radius: 50px; letter-spacing: 0.05em;
+    }
+
+    .fun-fact {
+      font-family: 'DM Mono', monospace; font-size: 0.78rem;
+      color: var(--muted); max-width: 300px; line-height: 1.7;
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 1rem 1.2rem; border-radius: 12px;
+    }
+
+    .btn-continue {
+      background: transparent; color: var(--text);
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: 0.9rem; border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 50px; padding: 0.8rem 2rem; cursor: pointer;
+      margin-top: 0.5rem; transition: border-color 0.2s, color 0.2s;
+    }
+    .btn-continue:hover { border-color: var(--accent); color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <!-- ── Screen 1: Pre-navigation ── -->
+  <div class="screen" id="screen-pre">
+    <a href="index.html" class="back-btn">← Back</a>
+    <p class="demo-tag">Demo 04 · AR Navigation</p>
+    <h1>Navigate to<br/><span>Target</span></h1>
+
+    <div class="config-box">
+      <div class="config-title">Target Config</div>
+      <div class="config-row"><span class="key">lat</span><span class="val" id="cfg-lat">—</span></div>
+      <div class="config-row"><span class="key">lng</span><span class="val" id="cfg-lng">—</span></div>
+      <div class="config-row"><span class="key">radius</span><span class="val" id="cfg-radius">—</span></div>
+    </div>
+
+    <p class="instruction">Follow the arrow to reach the target. The arrow updates in real-time as you move.</p>
+
+    <div class="tips">
+      <span>Enable GPS + Location Services</span>
+      <span>Hold phone upright, facing forward</span>
+      <span>Chrome on Android recommended</span>
+    </div>
+
+    <button class="btn-primary" id="btn-start">Start Navigation</button>
+  </div>
+
+  <!-- ── Screen 2: iOS compass permission ── -->
+  <div class="screen hidden" id="screen-permission">
+    <p class="demo-tag">Compass Access</p>
+    <div class="permission-icon">🧭</div>
+    <h1>Enable<br/><span>Compass</span></h1>
+    <p class="instruction">
+      This device requires explicit permission to access the compass.
+      Tap below to allow orientation access.
+    </p>
+    <button class="btn-primary" id="btn-compass">Allow Compass</button>
+    <button
+      style="background:transparent;border:none;font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--muted);cursor:pointer;text-decoration:underline;"
+      id="btn-skip-compass"
+    >Skip — show distance only</button>
+  </div>
+
+  <!-- ── Camera feed ── -->
+  <div id="camera-feed">
+    <video id="video" autoplay playsinline muted></video>
+  </div>
+
+  <!-- ── HUD overlay ── -->
+  <div id="hud">
+
+    <!-- Top bar -->
+    <div id="hud-top">
+      <!-- GPS status -->
+      <div class="hud-pill">
+        <div class="dot" id="dot-gps"></div>
+        <span id="label-gps">GPS…</span>
+      </div>
+
+      <!-- Compass heading -->
+      <div class="hud-pill">
+        <div class="dot compass" id="dot-compass"></div>
+        <span id="compass-readout">—°</span>
+      </div>
+    </div>
+
+    <!-- Arrow + distance -->
+    <div id="arrow-wrap">
+      <div id="arrow-ring">
+        <div id="proximity-pulse"></div>
+        <div id="arrow-rotate">
+          <!-- Simple geometric arrow SVG -->
+          <svg id="arrow-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path id="arrow-path"
+              d="M32 6
+                 L46 36
+                 L36 31
+                 L36 58
+                 L28 58
+                 L28 31
+                 L18 36
+                 Z"
+            />
+          </svg>
+        </div>
+      </div>
+
+      <div id="dist-label">
+        <div id="dist-meters">—</div>
+        <div id="dist-unit">meters away</div>
+      </div>
+    </div>
+
+    <!-- Calibration nudge -->
+    <div id="calibrate-hint">Move your phone in a figure-8 to calibrate</div>
+
+    <!-- Bottom -->
+    <div id="hud-bottom">
+      <div id="compass-warn">⚠ Compass unavailable — distance only</div>
+      <div id="nav-status">Acquiring signal…</div>
+      <button id="manual-btn">I'm here (manual)</button>
+    </div>
+
+  </div>
+
+  <!-- ── Success ── -->
+  <div id="success">
+    <div class="success-emoji">🎉</div>
+    <h2>You arrived!</h2>
+    <div class="points-badge">+50 points</div>
+    <div class="fun-fact">
+      You navigated to the target using live GPS and compass data. In GeoQuest, arriving unlocks the next mission clue.
+    </div>
+    <button class="btn-continue" onclick="window.location.href='index.html'">Back to Demos</button>
+  </div>
+
+  <script>
+    // ═══════════════════════════════════════════════
+    // CONFIG
+    // ═══════════════════════════════════════════════
+    const CONFIG = {
+      latitude:        30.412197,   // ← target latitude
+      longitude:       -9.564402,   // ← target longitude
+      proximityRadius: 15,        // meters
+    };
+    // ═══════════════════════════════════════════════
+
+    // Populate config display
+    document.getElementById('cfg-lat').textContent    = CONFIG.latitude;
+    document.getElementById('cfg-lng').textContent    = CONFIG.longitude;
+    document.getElementById('cfg-radius').textContent = CONFIG.proximityRadius + ' m';
+
+    // ── DOM refs ──
+    const screenPre        = document.getElementById('screen-pre');
+    const screenPermission = document.getElementById('screen-permission');
+    const cameraFeed       = document.getElementById('camera-feed');
+    const hud              = document.getElementById('hud');
+    const video            = document.getElementById('video');
+    const successEl        = document.getElementById('success');
+
+    const btnStart         = document.getElementById('btn-start');
+    const btnCompass       = document.getElementById('btn-compass');
+    const btnSkipCompass   = document.getElementById('btn-skip-compass');
+    const manualBtn        = document.getElementById('manual-btn');
+
+    const dotGps           = document.getElementById('dot-gps');
+    const labelGps         = document.getElementById('label-gps');
+    const dotCompass       = document.getElementById('dot-compass');
+    const compassReadout   = document.getElementById('compass-readout');
+    const arrowRotate      = document.getElementById('arrow-rotate');
+    const arrowPath        = document.getElementById('arrow-path');
+    const arrowRing        = document.getElementById('arrow-ring');
+    const arrowSvg         = document.getElementById('arrow-svg');
+    const distMeters       = document.getElementById('dist-meters');
+    const proximityPulse   = document.getElementById('proximity-pulse');
+    const navStatus        = document.getElementById('nav-status');
+    const compassWarn      = document.getElementById('compass-warn');
+    const calibrateHint    = document.getElementById('calibrate-hint');
+
+    // ── State ──
+    let currentLat      = null;
+    let currentLon      = null;
+    let smoothedHeading = null;   // compass heading, smoothed
+    let compassEnabled  = false;
+    let successShown    = false;
+    let watchId         = null;
+    let calibrateTimer  = null;
+    let headingSamples  = 0;
+
+    // ── Color thresholds (meters) ──
+    const COLOR_FAR  = '#ffffff';   // > 100m
+    const COLOR_MID  = '#f5c400';   // 50–100m
+    const COLOR_NEAR = '#00f5a0';   // < 50m
+    const COLOR_ZONE = '#00ff88';   // within radius
+
+    // ─────────────────────────────────────────
+    // MATH UTILS
+    // ─────────────────────────────────────────
+
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R  = 6371000;
+      const φ1 = lat1 * Math.PI / 180;
+      const φ2 = lat2 * Math.PI / 180;
+      const Δφ = (lat2 - lat1) * Math.PI / 180;
+      const Δλ = (lon2 - lon1) * Math.PI / 180;
+      const a  = Math.sin(Δφ/2)**2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    // Bearing from (lat1,lon1) to (lat2,lon2) in degrees 0–360
+    function bearing(lat1, lon1, lat2, lon2) {
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const lat1R = lat1 * Math.PI / 180;
+      const lat2R = lat2 * Math.PI / 180;
+      const y = Math.sin(dLon) * Math.cos(lat2R);
+      const x = Math.cos(lat1R) * Math.sin(lat2R)
+               - Math.sin(lat1R) * Math.cos(lat2R) * Math.cos(dLon);
+      return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    }
+
+    // Shortest angular difference (handles 359→1 wraparound)
+    function angleDiff(a, b) {
+      let d = b - a;
+      while (d > 180)  d -= 360;
+      while (d < -180) d += 360;
+      return d;
+    }
+
+    // ─────────────────────────────────────────
+    // ARROW COLOR by distance
+    // ─────────────────────────────────────────
+
+    function updateArrowColor(distance) {
+      let color, glow;
+
+      if (distance <= CONFIG.proximityRadius) {
+        color = COLOR_ZONE;
+        glow  = `drop-shadow(0 0 14px ${COLOR_ZONE})`;
+        proximityPulse.classList.add('active');
+        arrowRing.style.borderColor = 'rgba(0,255,136,0.4)';
+      } else if (distance < 50) {
+        color = COLOR_NEAR;
+        glow  = `drop-shadow(0 0 10px ${COLOR_NEAR})`;
+        proximityPulse.classList.remove('active');
+        arrowRing.style.borderColor = 'rgba(0,245,160,0.3)';
+      } else if (distance < 100) {
+        color = COLOR_MID;
+        glow  = `drop-shadow(0 0 8px ${COLOR_MID})`;
+        proximityPulse.classList.remove('active');
+        arrowRing.style.borderColor = 'rgba(245,196,0,0.2)';
+      } else {
+        color = COLOR_FAR;
+        glow  = `drop-shadow(0 0 6px rgba(255,255,255,0.4))`;
+        proximityPulse.classList.remove('active');
+        arrowRing.style.borderColor = 'rgba(255,255,255,0.12)';
+      }
+
+      arrowPath.style.fill = color;
+      arrowSvg.style.filter = glow;
+      distMeters.style.color = color;
+    }
+
+    // ─────────────────────────────────────────
+    // UPDATE HUD (called on every GPS + compass tick)
+    // ─────────────────────────────────────────
+
+    function updateHUD() {
+      if (currentLat === null) return;
+
+      const dist = haversine(currentLat, currentLon, CONFIG.latitude, CONFIG.longitude);
+      const distRounded = Math.round(dist);
+
+      // Distance display
+      distMeters.textContent = distRounded;
+
+      // Arrow color
+      updateArrowColor(dist);
+
+      // Arrow rotation
+      if (compassEnabled && smoothedHeading !== null) {
+        const targetBearing = bearing(currentLat, currentLon, CONFIG.latitude, CONFIG.longitude);
+        const arrowAngle    = (targetBearing - smoothedHeading + 360) % 360;
+        arrowRotate.style.transform = `rotate(${arrowAngle}deg)`;
+      }
+
+      // Status text
+      if (dist <= CONFIG.proximityRadius) {
+        navStatus.textContent = "✓ You've arrived!";
+        showSuccess();
+      } else if (!compassEnabled) {
+        navStatus.textContent = `${distRounded}m away — compass unavailable`;
+      } else {
+        navStatus.textContent = `${distRounded}m away — follow the arrow`;
+      }
+    }
+
+    // ─────────────────────────────────────────
+    // GPS
+    // ─────────────────────────────────────────
+
+    function startGPS() {
+      if (!('geolocation' in navigator)) {
+        labelGps.textContent = 'GPS unsupported';
+        return;
+      }
+
+      watchId = navigator.geolocation.watchPosition(
+        pos => {
+          currentLat = pos.coords.latitude;
+          currentLon = pos.coords.longitude;
+          dotGps.classList.add('active');
+          dotGps.classList.add('locked');
+          dotGps.classList.remove('active'); // keep lit, not blinking
+          dotGps.style.background = '#00f5a0';
+          labelGps.textContent = 'GPS locked';
+          updateHUD();
+        },
+        err => {
+          labelGps.textContent = 'GPS denied';
+          navStatus.textContent = 'Location access denied — use manual button';
+          console.warn('GPS error:', err.message);
+        },
+        { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+      );
+    }
+
+    // ─────────────────────────────────────────
+    // COMPASS
+    // ─────────────────────────────────────────
+
+    function onOrientationEvent(e) {
+      // webkitCompassHeading: iOS (0–360, 0=North)
+      // alpha: Android (degrees from North, but reversed — 360-alpha for true heading)
+      let heading;
+
+      if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
+        heading = e.webkitCompassHeading;
+      } else if (e.alpha !== null) {
+        heading = (360 - e.alpha) % 360;
+      } else {
+        return;
+      }
+
+      // Low-pass smoothing
+      if (smoothedHeading === null) {
+        smoothedHeading = heading;
+      } else {
+        // Use angular difference to handle 359↔0 wraparound
+        const diff = angleDiff(smoothedHeading, heading);
+        smoothedHeading = (smoothedHeading + diff * 0.2 + 360) % 360;
+      }
+
+      compassReadout.textContent = Math.round(smoothedHeading) + '°';
+      dotCompass.style.background = '#7b61ff';
+
+      headingSamples++;
+
+      // Show calibration hint for first 5 seconds
+      if (headingSamples < 10) {
+        calibrateHint.classList.add('show');
+        clearTimeout(calibrateTimer);
+        calibrateTimer = setTimeout(() => calibrateHint.classList.remove('show'), 5000);
+      }
+
+      updateHUD();
+    }
+
+    function startCompass() {
+      window.addEventListener('deviceorientationabsolute', onOrientationEvent, true);
+      window.addEventListener('deviceorientation',         onOrientationEvent, true);
+
+      // If no compass events in 3 seconds, warn user
+      setTimeout(() => {
+        if (smoothedHeading === null) {
+          compassWarn.classList.add('show');
+          compassReadout.textContent = 'N/A';
+        }
+      }, 3000);
+    }
+
+    // ─────────────────────────────────────────
+    // CAMERA
+    // ─────────────────────────────────────────
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
+        video.srcObject = stream;
+      } catch (err) {
+        console.warn('Camera error:', err.message);
+        // Camera failure is non-fatal — HUD still works
+      }
+    }
+
+    // ─────────────────────────────────────────
+    // LAUNCH NAV (after all permissions)
+    // ─────────────────────────────────────────
+
+    function launchNavigation() {
+      screenPre.classList.add('hidden');
+      screenPermission.classList.add('hidden');
+      cameraFeed.classList.add('active');
+      hud.classList.add('active');
+
+      startCamera();
+      startGPS();
+      startCompass();
+    }
+
+    // ─────────────────────────────────────────
+    // SUCCESS
+    // ─────────────────────────────────────────
+
+    function showSuccess() {
+      if (successShown) return;
+      successShown = true;
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      setTimeout(() => successEl.classList.add('show'), 300);
+    }
+
+    // ─────────────────────────────────────────
+    // BUTTON HANDLERS
+    // ─────────────────────────────────────────
+
+    btnStart.addEventListener('click', () => {
+      // Check if iOS compass permission is needed
+      if (typeof DeviceOrientationEvent !== 'undefined' &&
+          typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // iOS 13+ — show permission screen
+        screenPre.classList.add('hidden');
+        screenPermission.classList.remove('hidden');
+      } else {
+        // Android / desktop — no permission needed
+        compassEnabled = true;
+        launchNavigation();
+      }
+    });
+
+    btnCompass.addEventListener('click', async () => {
+      try {
+        const response = await DeviceOrientationEvent.requestPermission();
+        compassEnabled = (response === 'granted');
+        if (!compassEnabled) compassWarn.classList.add('show');
+      } catch (err) {
+        console.warn('Compass permission error:', err);
+        compassWarn.classList.add('show');
+      }
+      launchNavigation();
+    });
+
+    btnSkipCompass.addEventListener('click', () => {
+      compassEnabled = false;
+      compassWarn.classList.add('show');
+      launchNavigation();
+    });
+
+    manualBtn.addEventListener('click', showSuccess);
+  </script>
+
+</body>
+</html>
